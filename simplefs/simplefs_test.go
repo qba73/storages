@@ -12,16 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	byteKey        = "MyByteKey"
-	nonExistentKey = "NonExistentKey"
-	baseValue      = "My first data"
-)
-
-func getSimplefsInstance() (core.Storer, error) {
-	return simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
-}
-
 func newDefaultStore(t *testing.T) core.Storer {
 	t.Helper()
 	s, err := simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
@@ -29,25 +19,6 @@ func newDefaultStore(t *testing.T) core.Storer {
 		t.Fatal(err)
 	}
 	return s
-}
-
-func TestCreateDefaultStore(t *testing.T) {
-	_, err := getSimplefsInstance()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSimplefsConnectionFactory(t *testing.T) {
-	instance, err := getSimplefsInstance()
-
-	if nil != err {
-		t.Error("Shouldn't have panic")
-	}
-
-	if nil == instance {
-		t.Error("Simplefs should be instanciated")
-	}
 }
 
 func TestSetAndRetrieveValueFromStore(t *testing.T) {
@@ -70,99 +41,106 @@ func TestSetAndRetrieveValueFromStore(t *testing.T) {
 	}
 }
 
-func TestSimplefs_GetRequestInCache(t *testing.T) {
-	client, _ := getSimplefsInstance()
-	res := client.Get(nonExistentKey)
+func TestGetReturnsNilValueForNotExistingKey(t *testing.T) {
+	store := newDefaultStore(t)
 
-	if 0 < len(res) {
-		t.Errorf("Key %s should not exist", nonExistentKey)
-	}
-}
-
-func TestSimplefs_GetSetRequestInCache_OneByte(t *testing.T) {
-	client, _ := getSimplefsInstance()
-	_ = client.Set(byteKey, []byte("A"), time.Duration(20)*time.Second)
-	time.Sleep(1 * time.Second)
-
-	res := client.Get(byteKey)
-	if len(res) == 0 {
-		t.Errorf("Key %s should exist", byteKey)
-	}
-
-	if string(res) != "A" {
-		t.Errorf("%s not corresponding to %v", res, 65)
+	got := store.Get("not-existing-key")
+	if got != nil {
+		t.Errorf("want nil, got %v", got)
 	}
 }
 
 func TestSimplefs_SetRequestInCache_TTL(t *testing.T) {
+	store := newDefaultStore(t)
+
 	key := "MyEmptyKey"
-	client, _ := getSimplefsInstance()
 	value := []byte("Hello world")
-	_ = client.Set(key, value, time.Duration(20)*time.Second)
+
+	err := store.Set(key, value, time.Duration(20)*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	time.Sleep(1 * time.Second)
 
-	newValue := client.Get(key)
+	newValue := store.Get(key)
 
-	if len(newValue) != len(value) {
-		t.Errorf("Key %s should be equals to %s, %s provided", key, value, newValue)
+	if !cmp.Equal(newValue, value) {
+		t.Error(cmp.Diff(newValue, value))
 	}
 }
 
 func TestSimplefs_SetRequestInCache_Negative_TTL(t *testing.T) {
-	client, _ := getSimplefsInstance()
-	value := []byte("New value")
-	_ = client.Set(byteKey, value, -1)
+	store := newDefaultStore(t)
 
-	time.Sleep(1 * time.Second)
-
-	_ = client.Set(byteKey, value, time.Duration(20)*time.Second)
-	time.Sleep(1 * time.Second)
-
-	newValue := client.Get(byteKey)
-
-	if len(newValue) != len(value) {
-		t.Errorf("Key %s should be equals to %s, %s provided", byteKey, value, newValue)
+	k := "key"
+	v := []byte("New value")
+	err := store.Set(k, v, -1)
+	if err != nil {
+		t.Fatal(err)
 	}
+	time.Sleep(1 * time.Second)
+
+	err = store.Set(k, v, time.Duration(20)*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1 * time.Second)
+
+	nv := store.Get(k)
+	if !cmp.Equal(nv, v) {
+		t.Error(cmp.Diff(nv, v))
+	}
+
 }
 
 func TestSimplefs_DeleteRequestInCache(t *testing.T) {
-	client, _ := getSimplefsInstance()
-	client.Delete(byteKey)
+	store := newDefaultStore(t)
+
+	k := "key"
+	store.Delete(k)
 	time.Sleep(1 * time.Second)
 
-	if 0 < len(client.Get(byteKey)) {
-		t.Errorf("Key %s should not exist", byteKey)
+	got := store.Get(k)
+	if got != nil {
+		t.Errorf("want nil value for not exising key, got %v", got)
 	}
 }
 
-func TestSimplefs_Init(t *testing.T) {
-	client, _ := getSimplefsInstance()
-	err := client.Init()
-
-	if nil != err {
-		t.Error("Impossible to init Simplefs provider")
+func TestInitializeDefaultStore(t *testing.T) {
+	store := newDefaultStore(t)
+	err := store.Init()
+	if err != nil {
+		t.Error(err)
 	}
 }
 
 func TestSimplefs_EvictAfterXSeconds(t *testing.T) {
-	client, _ := getSimplefsInstance()
-	_ = client.Init()
+	store := newDefaultStore(t)
+	err := store.Init()
+	if err != nil {
+		t.Fatal(t)
+	}
 
+	v := []byte("base value")
 	for i := range 10 {
-		key := fmt.Sprintf("Test_%d", i)
-		_ = client.SetMultiLevel(key, key, []byte(baseValue), http.Header{}, "", time.Second, key)
+		k := fmt.Sprintf("Test_%d", i)
+		err := store.SetMultiLevel(k, k, v, http.Header{}, "", time.Second, k)
+		if err != nil {
+			t.Fatal(err)
+		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	res := client.Get("Test_0")
-	if len(res) != 0 {
-		t.Errorf("Key %s should be evicted", "Test_0")
+	k0 := "Test_0"
+	got := store.Get(k0)
+	if got != nil {
+		t.Errorf("want nil for key %s, got %v", k0, got)
 	}
 
-	res = client.Get("Test_9")
-	if len(res) == 0 {
-		t.Errorf("Key %s should exist", "Test_9")
+	k9 := "Test_9"
+	got = store.Get(k9)
+	if got == nil {
+		t.Errorf("want %v for key %s, got nil", v, k9)
 	}
-
 	time.Sleep(3 * time.Second)
 }
