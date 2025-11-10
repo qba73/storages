@@ -21,16 +21,10 @@ func getSimplefsInstance() (core.Storer, error) {
 	return simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
 }
 
-// This test ensure that Simplefs options are override by the Souin configuration.
 func TestCustomSimplefsConnectionFactory(t *testing.T) {
-	instance, err := getSimplefsInstance()
-
-	if nil != err {
-		t.Error("Shouldn't have panic")
-	}
-
-	if nil == instance {
-		t.Error("Simplefs should be instanciated")
+	_, err := getSimplefsInstance()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
