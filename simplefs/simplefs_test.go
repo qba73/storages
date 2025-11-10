@@ -8,6 +8,7 @@ import (
 
 	"github.com/darkweak/storages/core"
 	"github.com/darkweak/storages/simplefs"
+	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
 )
 
@@ -52,19 +53,20 @@ func TestSimplefsConnectionFactory(t *testing.T) {
 func TestSetAndRetrieveValueFromStore(t *testing.T) {
 	store := newDefaultStore(t)
 
-	err := store.Set("Test", []byte(baseValue), time.Duration(20)*time.Second)
+	k := "key"
+	v := []byte("My first data")
+
+	err := store.Set(k, v, time.Duration(20)*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(1 * time.Second)
 
-	res := store.Get("Test")
-	if len(res) == 0 {
-		t.Errorf("Key %s should exist", baseValue)
-	}
+	got := store.Get(k)
+	want := v
 
-	if baseValue != string(res) {
-		t.Errorf("%s not corresponding to %s", string(res), baseValue)
+	if !cmp.Equal(want, got) {
+		t.Error(cmp.Diff(want, got))
 	}
 }
 
