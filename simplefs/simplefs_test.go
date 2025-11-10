@@ -21,7 +21,7 @@ func getSimplefsInstance() (core.Storer, error) {
 	return simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
 }
 
-func TestCustomSimplefsConnectionFactory(t *testing.T) {
+func TestCreateDefaultStore(t *testing.T) {
 	_, err := getSimplefsInstance()
 	if err != nil {
 		t.Fatal(err)
