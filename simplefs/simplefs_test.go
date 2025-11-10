@@ -21,6 +21,15 @@ func getSimplefsInstance() (core.Storer, error) {
 	return simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
 }
 
+func newDefaultStore(t *testing.T) core.Storer {
+	t.Helper()
+	s, err := simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
 func TestCreateDefaultStore(t *testing.T) {
 	_, err := getSimplefsInstance()
 	if err != nil {
@@ -40,13 +49,16 @@ func TestSimplefsConnectionFactory(t *testing.T) {
 	}
 }
 
-func TestIShouldBeAbleToReadAndWriteDataInSimplefs(t *testing.T) {
-	client, _ := getSimplefsInstance()
+func TestSetAndRetrieveValueFromStore(t *testing.T) {
+	store := newDefaultStore(t)
 
-	_ = client.Set("Test", []byte(baseValue), time.Duration(20)*time.Second)
+	err := store.Set("Test", []byte(baseValue), time.Duration(20)*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	time.Sleep(1 * time.Second)
 
-	res := client.Get("Test")
+	res := store.Get("Test")
 	if len(res) == 0 {
 		t.Errorf("Key %s should exist", baseValue)
 	}
