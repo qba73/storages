@@ -24,20 +24,15 @@ func newDefaultStore(t *testing.T) core.Storer {
 func TestSetAndRetrieveValueFromStore(t *testing.T) {
 	store := newDefaultStore(t)
 
-	k := "key"
-	v := []byte("My first data")
-
-	err := store.Set(k, v, time.Duration(20)*time.Second)
+	err := store.Set("key", []byte("123"), time.Duration(20)*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(1 * time.Second)
 
-	got := store.Get(k)
-	want := v
-
-	if !cmp.Equal(want, got) {
-		t.Error(cmp.Diff(want, got))
+	got := store.Get("key")
+	if !cmp.Equal([]byte("123"), got) {
+		t.Error("stored and retrieved values don't match")
 	}
 }
 
@@ -50,47 +45,40 @@ func TestGetReturnsNilValueForNotExistingKey(t *testing.T) {
 	}
 }
 
-func TestSimplefs_SetRequestInCache_TTL(t *testing.T) {
+func TestRetrieveCachedDataFromStoreBeforeExpirationTime(t *testing.T) {
 	store := newDefaultStore(t)
 
-	key := "MyEmptyKey"
-	value := []byte("Hello world")
-
-	err := store.Set(key, value, time.Duration(20)*time.Second)
+	err := store.Set("key", []byte("123"), time.Duration(20)*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(1 * time.Second)
 
-	newValue := store.Get(key)
-
-	if !cmp.Equal(newValue, value) {
-		t.Error(cmp.Diff(newValue, value))
+	got := store.Get("key")
+	if !cmp.Equal([]byte("123"), got) {
+		t.Error("stored and retrieved values don't match")
 	}
 }
 
 func TestSimplefs_SetRequestInCache_Negative_TTL(t *testing.T) {
 	store := newDefaultStore(t)
 
-	k := "key"
-	v := []byte("New value")
-	err := store.Set(k, v, -1)
+	err := store.Set("key", []byte("123"), -1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(1 * time.Second)
 
-	err = store.Set(k, v, time.Duration(20)*time.Second)
+	err = store.Set("key", []byte("456"), time.Duration(20)*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(1 * time.Second)
 
-	nv := store.Get(k)
-	if !cmp.Equal(nv, v) {
-		t.Error(cmp.Diff(nv, v))
+	got := store.Get("key")
+	if !cmp.Equal([]byte("456"), got) {
+		t.Error("stored and retrieved values don't match")
 	}
-
 }
 
 func TestSimplefs_DeleteRequestInCache(t *testing.T) {
