@@ -21,14 +21,57 @@ func newDefaultStore(t *testing.T) core.Storer {
 	return s
 }
 
-func TestSetAndRetrieveValueFromStore(t *testing.T) {
-	store := newDefaultStore(t)
+func mustNewDefaultStore() core.Storer {
+	s, err := simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
 
-	err := store.Set("key", []byte("123"), time.Duration(20)*time.Second)
+func mustNewDefaultValidStore() core.Storer {
+	// Always create a store. Panic if for whever reason
+	// it's impossible to create it.
+	store, err := simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
+	if err != nil {
+		panic(err)
+	}
+
+	// Set a value in a store for duration of 200 millisecond.
+	// Panic if the Set operation is not successful.
+	err = store.Set("key", []byte("123"), time.Duration(200)*time.Millisecond)
+	if err != nil {
+		panic(err)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	// Retrieve the value from store. Panic if the operation is not successful.
+	got := store.Get("key")
+	if !cmp.Equal([]byte("123"), got) {
+		panic("stored and retrieved values don't match")
+	}
+
+	// Delete the value from store. Panic if the operation is not successful.
+	store.Delete("key")
+	// Try to get the value from store and make sure it doesn't exist.
+	// Panic if the operation is not successful.
+	got = store.Get("key")
+	if got != nil {
+		panic("stored and retrieved values don't match")
+	}
+
+	// Return the fully functioning store.
+	return store
+}
+
+func TestSetAndRetrieveValueFromStore(t *testing.T) {
+	store := mustNewDefaultStore()
+
+	err := store.Set("key", []byte("123"), time.Duration(200)*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	got := store.Get("key")
 	if !cmp.Equal([]byte("123"), got) {
@@ -103,7 +146,7 @@ func TestInitializeDefaultStore(t *testing.T) {
 }
 
 func TestSimplefs_EvictAfterXSeconds(t *testing.T) {
-	store := newDefaultStore(t)
+	store := mustNewDefaultValidStore()
 	err := store.Init()
 	if err != nil {
 		t.Fatal(t)
