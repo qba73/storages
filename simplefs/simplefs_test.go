@@ -12,55 +12,63 @@ import (
 	"go.uber.org/zap"
 )
 
+// newDefaultStore is a test helper that ensures
+// the store used in each test is always valid.
 func newDefaultStore(t *testing.T) core.Storer {
 	t.Helper()
-	s, err := simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
+	store, err := simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return s
+	return store
 }
 
+// mustNewDefaultStore creates the store and ensures it is valid for each test.
+//
+// The function panics when, for whatever reason, the Factory method returns an error.
+// This way, Go doesn't run all remaining tests that would report errors.
+// It stops test execution as soon as internal conditions prevent the creation of a valid store.
 func mustNewDefaultStore() core.Storer {
-	s, err := simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
+	store, err := simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
 	if err != nil {
 		panic(err)
 	}
-	return s
+	return store
 }
 
+// mustNewDefaultValidStore creates the store and ensures it is valid and functional for each test.
+//
+// The function ensures the store's core functionality by performing
+// basic store operations: storing and retrieving an item.
+//
+// The function panics when, for whatever reason, the Factory method
+// returns an error. This way, Go doesn't run all remaining tests
+// that would report errors. It stops test execution as soon as
+// internal conditions prevent the creation of a valid store.
 func mustNewDefaultValidStore() core.Storer {
-	// Always create a store. Panic if for whever reason
-	// it's impossible to create it.
 	store, err := simplefs.Factory(core.CacheProvider{}, zap.NewNop().Sugar(), 0)
 	if err != nil {
 		panic(err)
 	}
 
-	// Set a value in a store for duration of 200 millisecond.
-	// Panic if the Set operation is not successful.
 	err = store.Set("key", []byte("123"), time.Duration(200)*time.Millisecond)
 	if err != nil {
 		panic(err)
 	}
 	time.Sleep(50 * time.Millisecond)
 
-	// Retrieve the value from store. Panic if the operation is not successful.
 	got := store.Get("key")
 	if !cmp.Equal([]byte("123"), got) {
 		panic("stored and retrieved values don't match")
 	}
 
-	// Delete the value from store. Panic if the operation is not successful.
 	store.Delete("key")
-	// Try to get the value from store and make sure it doesn't exist.
-	// Panic if the operation is not successful.
+
 	got = store.Get("key")
 	if got != nil {
 		panic("stored and retrieved values don't match")
 	}
 
-	// Return the fully functioning store.
 	return store
 }
 
@@ -125,7 +133,7 @@ func TestSimplefs_SetRequestInCache_Negative_TTL(t *testing.T) {
 }
 
 func TestSimplefs_DeleteRequestInCache(t *testing.T) {
-	store := newDefaultStore(t)
+	store := mustNewDefaultValidStore()
 
 	k := "key"
 	store.Delete(k)
